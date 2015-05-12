@@ -144,10 +144,30 @@ QtSpeech::QtSpeech(VoiceName n, QObject * parent)
     d->ptrs << this;
 }
 
+void QtSpeech::setVoice(VoiceName voice) {
+    QString vId = voice.id;
+    wchar_t* tokenId = new wchar_t[vId.size()+1];
+    vId.toWCharArray(tokenId);
+    tokenId[vId.size()] = 0;
+
+    // create the voice token via the id
+    HRESULT hr = S_OK;
+    CComPtr<ISpObjectToken> cpVoiceToken;
+    hr = SpCreateNewToken(tokenId, &cpVoiceToken);
+    if (FAILED(hr)) {
+        qWarning() << "Creating the voice token from ID failed";
+        return;
+    }
+
+    delete[] tokenId;
+    d->voice->SetVoice(cpVoiceToken);
+    d->name = voice;
+}
+
 QtSpeech::~QtSpeech()
 {
     d->ptrs.removeAll(this);
-    delete d;
+//    delete d;
 }
 
 const QtSpeech::VoiceName & QtSpeech::name() const {
