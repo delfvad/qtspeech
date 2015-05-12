@@ -20,27 +20,26 @@ DEPENDPATH += $$PWD
 INCLUDEPATH += $$PWD
 
 HEADERS += \
-    QtSpeech \
-    QtSpeech.h \
+    $$PWD/QtSpeech \
+    $$PWD/QtSpeech.h
 
 macx {
-    SOURCES += QtSpeech_mac.cpp
+    SOURCES += $$PWD/QtSpeech_mac.cpp
     LIBS *= -framework AppKit
 }
 
 win32 {
-    SOURCES += QtSpeech_win.cpp
+    SOURCES += $$PWD/QtSpeech_win.cpp
 
-    INCLUDEPATH += "C:/Program Files/PSDK/Include"
-    INCLUDEPATH += "C:/Program Files/PSDK/Include/atl"
-    INCLUDEPATH += "C:/Program Files/Microsoft Speech SDK 5.1/Include"
+    INCLUDEPATH += "C:/Program Files/Microsoft Visual Studio 10.0/VC/atlmfc"
+    INCLUDEPATH += "C:/Program Files/Microsoft SDKs/Windows/v7.1/Include"
 
-    LIBS += -L"C:/Program Files/Microsoft Speech SDK 5.1/Lib/i386"
+    LIBS += -L"C:/Program Files/Microsoft SDKs/Windows/v7.1/Lib"
 }
 
 unix:!mac {
-    HEADERS += QtSpeech_unx.h
-    SOURCES += QtSpeech_unx.cpp
+    HEADERS += $$PWD/QtSpeech_unx.h
+    SOURCES += $$PWD/QtSpeech_unx.cpp
 
     INCLUDEPATH += $$PWD/festival/speech_tools/include
     INCLUDEPATH += $$PWD/festival/festival/src/include
