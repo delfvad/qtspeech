@@ -38,15 +38,15 @@ win32 {
 }
 
 unix:!mac {
+    INCLUDEPATH += /usr/include/speech_tools
+    INCLUDEPATH += /usr/include/festival
+
     HEADERS += $$PWD/QtSpeech_unx.h
     SOURCES += $$PWD/QtSpeech_unx.cpp
 
-    INCLUDEPATH += $$PWD/festival/speech_tools/include
-    INCLUDEPATH += $$PWD/festival/festival/src/include
-
     LIBS += -lncurses
-    LIBS += -L$$PWD/festival/festival/src/lib -lFestival
-    LIBS += -L$$PWD/festival/speech_tools/lib -lestools -lestbase -leststring
+    LIBS += -L/usr/lib/ -lFestival
+    LIBS += -L/usr/lib/ -lestools -lestbase -leststring
 
     # Linux: use asound 
     LIBS += -lasound

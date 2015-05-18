@@ -21,6 +21,8 @@
 #include <QtSpeech_unx.h>
 #include <festival.h>
 
+#include <QDebug>
+
 namespace QtSpeech_v1 { // API v1.0
 
 // some defines for throwing exceptions
@@ -37,26 +39,94 @@ namespace QtSpeech_v1 { // API v1.0
 
 // qobject for speech thread
 bool QtSpeech_th::init = false;
-void QtSpeech_th::say(QString text) {
-    try {
-        if (!init) {
+
+QtSpeech_th::QtSpeech_th(QObject * p)
+    :QObject(p), has_error(false), err(""), language("")
+{}
+
+QtSpeech_th::QtSpeech_th(const QString language, QObject * p)
+    :QObject(p), has_error(false), err(""), language(language)
+{}
+
+void QtSpeech_th::initFestival()
+{
+    if (!init)
+    {
+        try
+        {
+            qDebug() << "QtSpeech_th::initFestival";
             int heap_size = FESTIVAL_HEAP_SIZE;
-            festival_initialize(true,heap_size);
+            festival_initialize(true, heap_size);
             init = true;
+
+            EST_String get_langs(QString("(language.list)").toUtf8());
+            LISP lGetLangs = read_from_string((char *)get_langs);
+            LISP lLangs = leval(lGetLangs,NIL);
+            for(int i=0; i<siod_llength(lLangs); i++)
+                this->languages.append(QString(get_c_string(siod_nth(i, lLangs))));
+            qDebug() << "QtSpeech_th::initFestival >> " << this->languages;
+            has_error = false;
         }
+        catch(QtSpeech::LogicError e)
+        {
+            has_error = true;
+            err = e;
+        }
+    }
+
+    if(language.length() > 0)
+    {
+        EST_String estLanguage(language.toUtf8());
+        festival_init_lang(estLanguage);
+    }
+}
+
+void QtSpeech_th::say(const QString text)
+{
+    initFestival();
+    qDebug() << "QtSpeech_th::say >> " << text << " " << languages;
+    try
+    {
         has_error = false;
         EST_String est_text(text.toUtf8());
         SysCall(festival_say_text(est_text), QtSpeech::LogicError);
     }
-    catch(QtSpeech::LogicError e) {
+    catch(QtSpeech::LogicError e)
+    {
         has_error = true;
         err = e;
     }
     emit finished();
 }
 
+
+
+void QtSpeech_th::setLanguage(const QString lang)
+{
+    initFestival();
+    qDebug() << "QtSpeech_th::setLanguage >> " << lang;
+    try
+    {
+        has_error = false;
+        EST_String est_lang(lang.toUtf8());
+        SysCall(festival_eval_command(est_lang), QtSpeech::LogicError);
+    }
+    catch(QtSpeech::LogicError e)
+    {
+        has_error = true;
+        err = e;
+    }
+}
+
+QStringList QtSpeech_th::getLanguages()
+{
+    initFestival();
+    return this->languages;
+}
+
 // internal data
-class QtSpeech::Private {
+class QtSpeech::Private
+{
 public:
     Private()
         :onFinishSlot(0L) {}
@@ -69,12 +139,13 @@ public:
     static QPointer<QThread> speechThread;
 };
 QPointer<QThread> QtSpeech::Private::speechThread = 0L;
-const QString QtSpeech::Private::VoiceId = QString("festival:%1");
+const QString QtSpeech::Private::VoiceId = QString("%1");
 
 // implementation
 QtSpeech::QtSpeech(QObject * parent)
     :QObject(parent), d(new Private)
 {
+    // TODO: change default to first in list of languages
     VoiceName n = {Private::VoiceId.arg("english"), "English"};
     if (n.id.isEmpty())
         throw InitError(Where+"No default voice in system");
@@ -86,6 +157,7 @@ QtSpeech::QtSpeech(VoiceName n, QObject * parent)
     :QObject(parent), d(new Private)
 {
     if (n.id.isEmpty()) {
+        // TODO: change default to first in list of languages
         VoiceName def = {Private::VoiceId.arg("english"), "English"};
         n = def;
     }
@@ -102,24 +174,54 @@ QtSpeech::~QtSpeech()
     delete d;
 }
 
-const QtSpeech::VoiceName & QtSpeech::name() const {
+const QtSpeech::VoiceName & QtSpeech::name() const
+{
     return d->name;
 }
 
-QtSpeech::VoiceNames QtSpeech::voices()
+const QtSpeech::VoiceNames QtSpeech::voices() const
 {
+    if (!d->speechThread) {
+        d->speechThread = new QThread;
+        d->speechThread->start();
+    }
+
+    QtSpeech_th th;
+    th.moveToThread(d->speechThread);
+
     VoiceNames vs;
-    VoiceName n = {Private::VoiceId.arg("english"), "English"};
-    vs << n;
+    QStringList list;
+    QMetaObject::invokeMethod(&th, "getLanguages", Qt::BlockingQueuedConnection, Q_RETURN_ARG(QStringList, list));
+    qDebug() << "QtSpeech::voices " << list;
+    if (th.has_error)
+        throw th.err;
+    foreach(QString lang, th.getLanguages())
+    {
+        VoiceName n = {
+            Private::VoiceId.arg(lang)
+            , lang.replace(0, 1, lang[0].toUpper()).replace("_", " ")
+        };
+        vs << n;
+    }
+
     return vs;
 }
 
-void QtSpeech::tell(QString text) const {
+void QtSpeech::setVoice(VoiceName name)
+{
+    // TODO: implement set voice to Festival engine
+    d->name = name;
+}
+
+void QtSpeech::tell(QString text) const
+{
     tell(text, 0L,0L);
 }
 
 void QtSpeech::tell(QString text, QObject * obj, const char * slot) const
 {
+    qDebug() << "QtSpeech::tell >> " << text;
+
     if (!d->speechThread) {
         d->speechThread = new QThread;
         d->speechThread->start();
@@ -130,7 +232,7 @@ void QtSpeech::tell(QString text, QObject * obj, const char * slot) const
     if (obj && slot)
         connect(const_cast<QtSpeech *>(this), SIGNAL(finished()), obj, slot);
 
-    QtSpeech_th * th = new QtSpeech_th;
+    QtSpeech_th * th = new QtSpeech_th(d->name.id);
     th->moveToThread(d->speechThread);
     connect(th, SIGNAL(finished()), this, SIGNAL(finished()), Qt::QueuedConnection);
     connect(th, SIGNAL(finished()), th, SLOT(deleteLater()), Qt::QueuedConnection);
@@ -139,13 +241,14 @@ void QtSpeech::tell(QString text, QObject * obj, const char * slot) const
 
 void QtSpeech::say(QString text) const
 {
+    qDebug() << "QtSpeech::say >> " << text;
     if (!d->speechThread) {
         d->speechThread = new QThread;
         d->speechThread->start();
     }
 
     QEventLoop el;
-    QtSpeech_th th;
+    QtSpeech_th th(d->name.id);
     th.moveToThread(d->speechThread);
     connect(&th, SIGNAL(finished()), &el, SLOT(quit()), Qt::QueuedConnection);
     QMetaObject::invokeMethod(&th, "say", Qt::QueuedConnection, Q_ARG(QString,text));
