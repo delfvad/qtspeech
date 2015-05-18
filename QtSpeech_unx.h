@@ -21,17 +21,21 @@
 
 #include <QObject>
 #include <QtSpeech>
+#include <QStringList>
 
 namespace QtSpeech_v1 { // API v1.0
 
 class QtSpeech_th : public QObject {
 Q_OBJECT
 public:
-    QtSpeech_th(QObject * p =0L):QObject(p),has_error(false),err("") {}
+    QtSpeech_th(QObject * p =0L);
+    QtSpeech_th(const QString language, QObject * p =0L);
     virtual ~QtSpeech_th() {}
 
 public slots:
-    void say(QString text);
+    void say(const QString text);
+    void setLanguage(const QString lang);
+    QStringList getLanguages();
 
 signals:
     void logicError(QtSpeech::LogicError);
@@ -42,6 +46,10 @@ private:
     QtSpeech::LogicError err;
     bool has_error;
     static bool init;
+    QStringList languages;
+    QString language;
+
+    void initFestival();
 };
 
 }; // namespace QtSpeech_v1
