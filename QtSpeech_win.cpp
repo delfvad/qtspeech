@@ -174,7 +174,7 @@ const QtSpeech::VoiceName & QtSpeech::name() const {
     return d->name;
 }
 
-QtSpeech::VoiceNames QtSpeech::voices()
+const QtSpeech::VoiceNames QtSpeech::voices() const
 {
     VoiceNames vs;       
     ULONG count = 0;
